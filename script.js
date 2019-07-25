@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Backpack.tf Premium Spell Scanner
 // @namespace    https://greasyfork.org/users/313414
-// @version      1.05.1
+// @version      1.06
 // @description  Scans through backpack.tf premium search pages with ctrl+leftarrow and ctrl+rightarrow. The scanning stops when a spelled item appears on page. Ctrl + down arrow to force stop.
 // @author       Matt-RJ
 // @match        *backpack.tf/premium/search*
@@ -12,12 +12,23 @@ var notificationSoundEnabled = true;
 var notificationSoundVolume = 0.75; // Ranges from 0.0 to 1.0
 var notificationSoundSource = "https://notificationsounds.com/soundfiles/99c5e07b4d5de9d18c350cdf64c5aa3d/file-sounds-1110-stairs.mp3";
 var endNotificationSoundSource = "https://notificationsounds.com/soundfiles/0fcbc61acd0479dc77e3cccc0f5ffca7/file-sounds-1078-case-closed.mp3";
-var spellBlackList = ["Voices From Below","Exorcism"]; // Any spell names here will be ignored by the scanner
-var spellWhiteList = []; // If any spells are named here, they will be the only ones to appear. (Overrides spellBlackList)
+
+// Any spell names here will be ignored by the scanner
+var spellBlackList = ["Voices From Below","Exorcism"];
+
+// If any spells are named here, they will be the only ones to appear. (Overrides spellBlackList)
+var spellWhiteList = [];
+
+/*
+How long to pause for before loading another page during a search (in ms).
+WARNING: Low values may cause too many requests to be sent to backpack.tf over a period of time. Use lower values at your own risk.
+*/
+var searchDelay = 750;
+
 
 
 var searchState = getCookie("searchState"); // -1 when searching by going backwards, 0 when staying still, 1 when searching forwards
-var notificationPlayer = document.createElement('audio');
+var notificationPlayer = document.createElement('audio'); // Used for notification sounds
 
 setup();
 run();
@@ -28,12 +39,12 @@ function setup() {
     notificationPlayer.volume = notificationSoundVolume;
 
     // Stops scanning if spells are found
-    if (spellsFoundOnPage() === true) {
+    if (spellsFoundOnPage()) {
         searchState = 0;
     }
 
     // Stops scanning if on first or last page
-    if (onFirstOrLastPage() === true) {
+    if (onFirstOrLastPage()) {
         playNotificationSound(endNotificationSoundSource);
         searchState = 0;
     }
@@ -41,12 +52,14 @@ function setup() {
 
 function run() {
     if (searchState == -1) {
-        // Check if first page here
-        openPreviousPage();
+        setTimeout(function() {
+            openPreviousPage();
+        }, searchDelay);
     }
     else if (searchState == 1) {
-        // Check if last page here
-        openNextPage();
+        setTimeout(function() {
+            openNextPage();
+        }, searchDelay);
     }
     else if (searchState === 0) {
         saveCookie("searchState",0,0.15);
@@ -61,9 +74,7 @@ function onFirstOrLastPage() {
 
 function playNotificationSound(src) {
     notificationPlayer.src = src;
-    if (notificationSoundEnabled === true) {
-        notificationPlayer.play();
-    }
+    if (notificationSoundEnabled) notificationPlayer.play();
 }
 
 
@@ -148,7 +159,7 @@ function spellsFoundOnPage() {
             }
         }
     }
-    if (spellFound === true) playNotificationSound(notificationSoundSource);
+    if (spellFound) playNotificationSound(notificationSoundSource);
     return spellFound;
 }
 
@@ -163,6 +174,7 @@ function blackListMatch(dataSpellAttribute) {
     return false;
 }
 
+// Determines if dataSpellAttribute contains a whitelisted spell from spellWhiteList
 function whiteListMatch(dataSpellAttribute) {
     for (var i = 0; i < spellWhiteList.length; i++) {
         if (dataSpellAttribute.search(spellWhiteList[i]) != -1) {
@@ -176,7 +188,7 @@ function whiteListMatch(dataSpellAttribute) {
 // Handles keyboard inputs
 window.onkeydown = function(e) {
 
-    if (e.ctrlKey === true) {
+    if (e.ctrlKey) {
         if (e.keyCode == 40) { // Ctrl + down arrow
             searchState = 0;
             saveCookie("searchState",0,0.1);
